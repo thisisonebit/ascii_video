@@ -36,25 +36,22 @@ except Exception as e:
 DEFAULT_CHARS = " .:-=+*#%@"
 CSI = "\x1b["
 
-
+#used to get the terminal size
 def get_term_size() -> Tuple[int, int]:
-    """Return terminal size as (columns, rows)."""
     try:
         size = shutil.get_terminal_size(fallback=(80, 24))
         return size.columns, size.lines
     except Exception:
         return (80, 24)
 
-
+#ok so this is basically a clamp function to keep the values between a specific range so as to not go out of bounds and either mess up openCV or the terminal rendering
 def clamp(n: int, lo: int, hi: int) -> int:
     return max(lo, min(hi, n))
 
-
+#so this class basically makes it possible to render stuff. It uses ANSI escape codes to control the terminal.
 class TerminalRenderer:
-    """
-    Manages terminal state: hide cursor, optional alternate screen, render frames.
-    """
-
+    
+    #initializes the terminal renderer. 
     def __init__(self, use_alt_screen: bool = False):
         self.use_alt_screen = use_alt_screen
         self._active = False
@@ -62,7 +59,7 @@ class TerminalRenderer:
     def __enter__(self):
         # Hide cursor
         sys.stdout.write(f"{CSI}?25l")
-        # Enter alternate screen if requested
+        # Enter alternate screen buffer so as to not mess up the original terminal content
         if self.use_alt_screen:
             sys.stdout.write(f"{CSI}?1049h")
         # Move cursor home and clear screen initially
@@ -83,10 +80,6 @@ class TerminalRenderer:
         self._active = False
 
     def render(self, lines: List[str]):
-        """
-        Render a frame given a list of lines. Keeps the buffer stable by moving
-        the cursor to the home position and writing the new content.
-        """
         # Move cursor to home
         sys.stdout.write(f"{CSI}H")
         # Write all lines joined once for efficiency
@@ -136,7 +129,7 @@ class FrameConverter:
             # Default to terminal width when fitting, else 80 columns
             target_cols = term_cols if fit_terminal else 80
 
-        # Initial rows estimate based on aspect
+        #calculate the rows based on the font aspect ratio and the video frame dimensions
         rows = max(1, int(frame_h * (target_cols / frame_w) * self.font_aspect))
 
         if fit_terminal:
@@ -304,7 +297,7 @@ class FrameConverter:
 
         return lines
 
-
+#capture the video from either a file or a camera
 def open_capture(source: str, camera: bool = False) -> cv2.VideoCapture:
     """
     Open a cv2.VideoCapture from either a file path or a camera index.
@@ -327,7 +320,7 @@ def open_capture(source: str, camera: bool = False) -> cv2.VideoCapture:
 
     return cap
 
-
+#compute the target fps, pretty much
 def compute_target_fps(cap: cv2.VideoCapture, fps_override: float) -> float:
     """
     Decide the target FPS. Prefer override, then video fps, else 30.
@@ -340,11 +333,9 @@ def compute_target_fps(cap: cv2.VideoCapture, fps_override: float) -> float:
         return 30.0
     return float(fps)
 
-
+#ctrl or cmd c exit handler
 def install_sigint_handler():
-    """
-    Make Ctrl-C responsive by avoiding delayed KeyboardInterrupt during sleep on some platforms.
-    """
+    #Make Ctrl-C responsive by avoiding delayed KeyboardInterrupt during sleep on some platforms.
     signal.signal(signal.SIGINT, signal.default_int_handler)
 
 
@@ -568,7 +559,7 @@ def main(argv: Optional[List[str]] = None):
         sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
 
-
+#just the menu driven program
 def interactive_main():
     def ask_bool(prompt: str, default: bool = False) -> bool:
         suffix = " [Y/n]: " if default else " [y/N]: "
@@ -604,6 +595,7 @@ def interactive_main():
 
     print("Terminal Video Player (ASCII/Blocks) - Interactive Setup")
 
+    # --- Basic options (shown to every user) ---
     camera = ask_bool("Use camera as source?", default=False)
     if camera:
         source = input("Enter camera index (e.g., 0): ").strip()
@@ -623,17 +615,8 @@ def interactive_main():
         "Enter terminal width in columns (leave blank to auto): ", default=None
     )
     fit = ask_bool("Fit rendering to terminal size?", default=False)
-    fps_override = ask_float(
-        "Override FPS (leave blank to use video/default): ", default=None
-    )
 
-    charset_in = input(
-        f"Enter ASCII charset (light->dark) [default: {DEFAULT_CHARS}]: "
-    ).strip()
-    charset = charset_in if charset_in else DEFAULT_CHARS
-
-    invert = ask_bool("Invert brightness mapping?", default=False)
-
+    # Mode selection is part of the basic flow so users can start quickly
     blocks = ask_bool(
         "Use high-density colored half-blocks (recommended for best quality)?",
         default=False,
@@ -642,11 +625,34 @@ def interactive_main():
     if not blocks:
         color_ascii = ask_bool("Colorize ASCII characters?", default=False)
 
-    frame_skip = ask_bool("Enable frame skipping when behind?", default=True)
-    loop = ask_bool("Loop playback when reaching the end?", default=False)
-    alt_screen = ask_bool(
-        "Use alternate screen buffer (cleaner experience)?", default=True
-    )
+    # --- Advanced options (hidden unless requested) ---
+    advanced = ask_bool("Configure advanced options?", default=False)
+
+    if advanced:
+        fps_override = ask_float(
+            "Override FPS (leave blank to use video/default): ", default=None
+        )
+
+        charset_in = input(
+            f"Enter ASCII charset (light->dark) [default: {DEFAULT_CHARS}]: "
+        ).strip()
+        charset = charset_in if charset_in else DEFAULT_CHARS
+
+        invert = ask_bool("Invert brightness mapping?", default=False)
+
+        frame_skip = ask_bool("Enable frame skipping when behind?", default=True)
+        loop = ask_bool("Loop playback when reaching the end?", default=False)
+        alt_screen = ask_bool(
+            "Use alternate screen buffer (cleaner experience)?", default=True
+        )
+    else:
+        # Use sensible defaults when advanced options are skipped
+        fps_override = None
+        charset = DEFAULT_CHARS
+        invert = False
+        frame_skip = True
+        loop = False
+        alt_screen = True
 
     try:
         play(

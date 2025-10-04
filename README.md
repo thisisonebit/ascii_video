@@ -76,35 +76,79 @@ python -c 'import sys, index; index.main(sys.argv[1:])' -- \
 
 If you prefer to always use flags, you can change the last line of `index.py` from `interactive_main()` to `main()`.
 
-## Usage (CLI flags)
+## CLI options (detailed)
 
-Flags are available when calling `main()` (see “Non‑interactive CLI mode”).
+When you call `main()` (or run the CLI directly when you change the entry point), these options control behavior. Below each flag is a short explanation, recommended use, and examples.
 
-```
-positional arguments:
-	source                Video file path (default) or camera index when --camera is set.
+Positional
+- source
+	- What: Video file path, or a camera index when used with `--camera`.
+	- Example: `myvideo.mp4` or `0` with `--camera`.
 
-options:
-	-w, --width INT       Target terminal width in columns. If omitted with --fit, uses terminal width.
-	--fit                 Fit rendering to the current terminal size (columns and rows).
-	--fps FLOAT           Override target FPS. Otherwise uses video FPS, falling back to 30.
-	--charset STRING      Characters from light to dark for ASCII mode. Default: " .:-=+*#%@"
-	--invert              Invert brightness mapping (light <-> dark).
-	--color               Colorize ASCII characters using per‑cell color (slower).
-	--blocks              High‑density colored half‑blocks (▀) with truecolor FG/BG. Implies color output.
-	--frame-skip          Skip frames if playback falls behind schedule.
-	--loop                Loop playback when reaching the end of the source.
-	--alt-screen          Use the terminal's alternate screen (restores original on exit).
-	--camera              Interpret SOURCE as a camera index (e.g., 0) instead of a file path.
-```
+Options
+- -w, --width INT
+	- What: Target terminal width in columns. The converter resizes frames to this column count; rows are computed from video aspect and the internal font aspect ratio.
+	- When to use: Fix the output width for consistent art size across terminals or recordings.
+	- Example: `-w 80` (common default for readable ASCII).
 
-Examples:
+- --fit
+	- What: Scale the rendering to fit your current terminal width and height while preserving aspect.
+	- When to use: When you want the image to fill your terminal without manual sizing.
+	- Example: `--fit`
+
+- --fps FLOAT
+	- What: Override the playback frames-per-second. If omitted, the player uses the video file's reported FPS, falling back to 30 if unknown.
+	- When to use: To slow down or smooth playback, or when the video metadata is incorrect.
+	- Example: `--fps 24` or `--fps 29.97`
+
+- --charset STRING
+	- What: A string of characters ordered from light → dark used for ASCII mapping (default: `" .:-=+*#%@"`).
+	- When to use: Custom artistic effects or to change perceived contrast.
+	- Example: `--charset " .'`^",;:!~*#%&@` (be careful to shell-escape)
+
+- --invert
+	- What: Invert brightness mapping so light becomes dark (useful for negative/film-like effects or dark terminal themes).
+	- Note: In `--blocks` mode invert flips colors (RGB -> 255 - RGB).
+	- Example: `--invert`
+
+- --color
+	- What: Colorize ASCII characters using per-cell 24-bit color (slower than plain ASCII). Each printed character gets a foreground color matching the sampled pixel.
+	- When to use: If you want colored ASCII and can accept higher CPU / terminal bandwidth.
+	- Example: `--color`
+
+- --blocks
+	- What: Use high-density half-block rendering (the `▀` glyph): each terminal cell represents two vertical pixels using foreground=top and background=bottom 24-bit colors.
+	- When to use: Best visual detail and fidelity when your terminal supports TrueColor and Unicode.
+	- Note: Implies color—`--color` is redundant when using `--blocks`.
+	- Example: `--blocks`
+
+- --frame-skip
+	- What: When playback falls behind schedule, drop frames to catch up instead of stretching time between frames.
+	- When to use: Useful on slower machines to keep motion fluid at the cost of skipped frames.
+	- Example: `--frame-skip`
+
+- --loop
+	- What: Loop the video when the end of the source is reached.
+	- When to use: For continuous demos or kiosk-style playback.
+	- Example: `--loop`
+
+- --alt-screen
+	- What: Render in the terminal's alternate screen buffer (ESC[?1049h / ESC[?1049l). This preserves your original shell screen and scrollback while the player runs.
+	- When to use: If you want a clean experience that restores your terminal on exit (default in the interactive flow).
+	- Example: `--alt-screen`
+
+- --camera
+	- What: Treat `source` as an integer camera index (e.g., `0`) and open with `cv2.VideoCapture(index)`.
+	- When to use: To stream from webcams or connected capture devices.
+	- Example: `--camera` with `source` of `0`.
+
+Examples
 
 ```bash
 # Play a video file at 80 cols, ASCII
 python -c 'import sys, index; index.main(sys.argv[1:])' -- myvideo.mp4 -w 80
 
-# Camera 0, fit to terminal, high‑density colored blocks
+# Camera 0, fit to terminal, high-density colored blocks
 python -c 'import sys, index; index.main(sys.argv[1:])' -- --camera 0 --fit --blocks
 
 # File, colorized ASCII, invert, 24 FPS, allow frame skipping
